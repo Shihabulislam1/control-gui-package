@@ -1,0 +1,32 @@
+# Ignore build and install directories
+/build/
+/install/
+/log/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore CMake build files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Ignore other generated files
+*.log
+*.swp
+*.bak
+*.tmp
+*.DS_Store
+
+# Ignore Visual Studio Code workspace settings
+.vscode/
+
+# Ignore JetBrains IDEs settings
+.idea/
+
+# Ignore ROS2 specific files
+.colcon/
+ros2_ws/
