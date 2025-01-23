@@ -13,18 +13,37 @@ class ControlGUI(tk.Tk):
     def __init__(self):
         super().__init__()
 
-                # Initialize window tracking dictionary as instance variable
+        # Initialize window tracking dictionary as instance variable
         self._open_windows = {}  
         self.title("MERR Control Panel")
         self.geometry("1024x600")
         self.configure(bg="#ffffff")
 
-                # Initialize ROS2
+         # Initialize ROS2
         try:
             rclpy.init()
         except Exception as e:
             print(f"Failed to initialize ROS2: {e}")
             self.quit()
+
+        # Defining publishers
+        self.node = Node('control_gui_node')
+        self.cmd_vel_publisher = self.node.create_publisher(Twist, 'cmd_vel', 10)
+        self.arm_command_publisher = self.node.create_publisher(ROSString, 'arm_command', 10)
+        self.actuator_command_publishers = [
+            self.node.create_publisher(ROSString, f'actuator{i+1}_command', 10) for i in range(5)
+        ]
+        self.relay_switch_publisher = self.node.create_publisher(ROSString, 'relay_switch_controller', 10)
+
+        self.drill_motor_publisher = self.node.create_publisher(ROSString, 'drill_motor_control', 10)
+
+        self.drill_motor_position_motor_publisher = self.node.create_publisher(ROSString, 'drill_motor_position_motor', 10)
+
+        self.soil_sensor_motor_publisher = self.node.create_publisher(ROSString, 'soil_sensor_motor_control', 10)
+
+        self.science_motor1_publisher = self.node.create_publisher(ROSString, 'science_motor1_control', 10)
+        self.science_motor2_publisher = self.node.create_publisher(ROSString, 'science_motor2_control', 10)
+
 
         # Main container
         self.container = tk.Frame(self)
@@ -49,7 +68,17 @@ class ControlGUI(tk.Tk):
         new_window.title(tab_class.__name__)
         new_window.geometry("800x600")
         
-        tab = tab_class(new_window)
+        tab = tab_class(new_window, 
+                        self.cmd_vel_publisher, 
+                        self.arm_command_publisher, 
+                        self.actuator_command_publishers, 
+                        self.relay_switch_publisher,
+                        self.drill_motor_publisher,
+                        self.drill_motor_position_motor_publisher,
+                        self.soil_sensor_motor_publisher,
+                        self.science_motor1_publisher,
+                        self.science_motor2_publisher,)
+
         tab.pack(fill="both", expand=True)
         self._open_windows[tab_class.__name__] = new_window
         
@@ -65,15 +94,6 @@ class ControlGUI(tk.Tk):
     def __del__(self):
         # Cleanup ROS2
         rclpy.shutdown()
-
-
-
-
-
-
-
-
-
 
 
 
@@ -103,7 +123,7 @@ class Sidebar(tk.Frame):
 
 
 class Tab1(tk.Frame, Node):
-    def __init__(self, parent):
+    def __init__(self, parent, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
         tk.Frame.__init__(self, parent, bg="white")
         Node.__init__(self, 'tab1_node')
         
@@ -114,11 +134,13 @@ class Tab1(tk.Frame, Node):
             self.image_callback,
             10
         )
-        self.cmd_vel_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        self.arm_command_publisher = self.create_publisher(ROSString, 'arm_command', 10)
-        self.actuator_command_publishers = [
-        self.create_publisher(ROSString, f'actuator{i+1}_command', 10) for i in range(5)
-        ]
+
+        # Use publishers passed from ControlGUI
+        self.cmd_vel_publisher = cmd_vel_publisher
+        self.arm_command_publisher = arm_command_publisher
+        self.actuator_command_publishers = actuator_command_publishers
+        self.relay_switch_publisher = relay_switch_publisher
+
 
         # Video stream label
         self.video_label = tk.Label(self, bg="black")
@@ -157,6 +179,11 @@ class Tab1(tk.Frame, Node):
         self.backward_button = tk.Button(self.rover_control_frame, text="Backward", command=self.move_backward, font=("Arial", 12))
         self.backward_button.grid(row=2, column=1, padx=5, pady=5)
 
+        # Speed control slider
+        self.speed_slider = tk.Scale(self.rover_control_section, from_=0, to=100, resolution=1, orient=tk.HORIZONTAL, label="Speed")
+        self.speed_slider.set(0.5)  # Default speed
+        self.speed_slider.pack(pady=5)
+
         # Actuator control section
         self.actuator_control_section = tk.Frame(self.control_frames_container, bg="white")
         self.actuator_control_section.pack(side=tk.LEFT, padx=10, pady=10)
@@ -170,6 +197,19 @@ class Tab1(tk.Frame, Node):
         for i in range(5):
             self.create_actuator_control_buttons(self.actuator_control_frame, i)
 
+
+        # Relay switch control section
+        self.relay_switch_control_section = tk.Frame(self.control_frames_container, bg="white")
+        self.relay_switch_control_section.pack(side=tk.LEFT, padx=10, pady=10)
+
+        self.relay_switch_label = tk.Label(self.relay_switch_control_section, text="Relay Switch Control", font=("Arial", 14, "bold"), bg="white")
+        self.relay_switch_label.pack()
+
+        self.relay_switch_control_frame = tk.Frame(self.relay_switch_control_section, bg="white")
+        self.relay_switch_control_frame.pack(pady=5)
+
+        for i in range(25):
+            self.create_relay_switch_buttons(self.relay_switch_control_frame, i)
 
         self.image = None
         self.update_image()
@@ -187,6 +227,19 @@ class Tab1(tk.Frame, Node):
 
         reverse_button = tk.Button(parent, text="Reverse", command=lambda: self.send_actuator_command(index, "reverse"), font=("Arial", 12))
         reverse_button.grid(row=index, column=3, padx=5, pady=5)
+
+    def create_relay_switch_buttons(self, parent, index):
+        col = index // 5  # Determine the column (0, 1, 2, or 3)
+        row = index % 5   # Determine the row (0 to 6)
+
+        label = tk.Label(parent, text=f"Channel {index+1}", font=("Arial", 12), bg="white")
+        label.grid(row=row, column=col*3, padx=5, pady=5)  # Place the label at the appropriate row and column
+
+        on_button = tk.Button(parent, text="ON", command=lambda: self.send_relay_switch_command(index, "ON"), font=("Arial", 12))
+        on_button.grid(row=row, column=col*3+1, padx=5, pady=5)  # Place the ON button next to the label
+
+        off_button = tk.Button(parent, text="OFF", command=lambda: self.send_relay_switch_command(index, "OFF"), font=("Arial", 12))
+        off_button.grid(row=row, column=col*3+2, padx=5, pady=5)  # Place the OFF button next to the ON button
 
 
     def image_callback(self, msg):
@@ -208,20 +261,24 @@ class Tab1(tk.Frame, Node):
         self.image_subscriber.destroy()
 
     def move_forward(self):
-        self.send_twist_command(0.5, 0.0)
-        print("Moving forward", 0.5, 0.0)
+        speed = self.speed_slider.get()/100
+        self.send_twist_command(speed, 0.0)
+        print("Moving forward", speed, 0.0)
 
     def move_backward(self):
-        self.send_twist_command(-0.5, 0.0)
-        print("Moving backward", -0.5, 0.0)
+        speed = self.speed_slider.get()/100
+        self.send_twist_command(-speed, 0.0)
+        print("Moving backward", -speed, 0.0)
 
     def turn_left(self):
-        self.send_twist_command(0.0, 0.5)
-        print("Turning left", 0.0, 0.5)
+        speed = self.speed_slider.get()/100
+        self.send_twist_command(0.0, speed)
+        print("Turning left", 0.0, speed)
 
     def turn_right(self):
-        self.send_twist_command(0.0, -0.5)
-        print("Turning right", 0.0, -0.5)
+        speed = self.speed_slider.get()/100
+        self.send_twist_command(0.0, -speed)
+        print("Turning right", 0.0, -speed)
 
     def stop_movement(self):
         self.send_twist_command(0.0, 0.0)
@@ -260,10 +317,15 @@ class Tab1(tk.Frame, Node):
         self.actuator_command_publishers[index].publish(actuator_command)
         print(f"Sending {command} command to actuator {index+1}")
 
+    def send_relay_switch_command(self, index, command):
+        relay_command = ROSString()
+        relay_command.data = f"Channel {index+1} {command}"
+        self.relay_switch_publisher.publish(relay_command)
+        print(f"Sending {command} command to Channel {index+1}")
 
 
 class Tab2(tk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
         super().__init__(parent, bg="white")
 
         label = tk.Label(self, text="TAB 2: 5 DC Motor Control", font=("Arial", 16))
@@ -284,12 +346,8 @@ class Tab2(tk.Frame):
         self.stop_button.pack(pady=5)
 
 
-
-
-
-
 class Tab3(tk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
         super().__init__(parent, bg="white")
 
         label = tk.Label(self, text="TAB 3: Video Streams & Sensor Data", font=("Arial", 16))
