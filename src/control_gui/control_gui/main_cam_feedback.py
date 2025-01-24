@@ -1,95 +1,175 @@
-import tkinter as tk
-from PIL import Image, ImageTk
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image as ROSImage
+import tkinter as tk
+from tkinter import ttk
+from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
+from PIL import Image as PILImage
+from PIL import ImageTk
 
-class VideoGUI:
-    def __init__(self):
-        # Initialize TKinter
-        self.root = tk.Tk()
-        self.root.title("Main Cam Video")
-        # geometry of 1024x768
-        self.root.geometry("1024x768")
-
-        # Initialize ROS 2 and the Node
-        rclpy.init()
-        self.node = Node('video_gui_node')
-
-        # Initialize the CvBridge
+class VideoStreamGUI(Node):
+    def __init__(self, master):
+        super().__init__('tkinter_video_viewer')
+        self.master = master
+        self.master.title("ROS2 Video Stream")
+        
+        # Initialize the bridge between ROS and OpenCV
         self.bridge = CvBridge()
-
+        
+        # Create a label to display the video
+        self.video_label = ttk.Label(master)
+        self.video_label.pack(padx=10, pady=10)
+        
         # Subscribe to the image topic
-        self.image_subscriber = self.node.create_subscription(
-            ROSImage,
-            'image_raw/uncompressed',  # Replace with your actual topic
+        self.image_sub = self.create_subscription(
+            Image,
+            'image_raw/uncompressed',
             self.image_callback,
-            10
+            10  # QoS profile depth
         )
-
-        # Initialize the image variable and the GUI panel
-        self.image = None
-        self.panel = tk.Label(self.root)
-        self.panel.pack()
-
-        # Start the ROS spin and image update loops
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.update_image()
-        self.spin_ros()
-
-        # Start the TKinter main loop
-        self.root.mainloop()
+        
+        # Add a quit button
+        self.quit_button = ttk.Button(
+            master,
+            text="Quit",
+            command=self.cleanup_and_quit
+        )
+        self.quit_button.pack(pady=5)
 
     def image_callback(self, msg):
-        """Receive images from ROS and convert them to OpenCV format"""
         try:
             # Convert ROS Image message to OpenCV image
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            # Convert BGR to RGB
-            cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-            # Store the image
-            self.image = cv_image
-            print("Image received")  # Debug print
+            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            
+            # Convert OpenCV image to PIL format
+            pil_image = PILImage.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB))
+            
+            # Convert PIL image to PhotoImage for Tkinter
+            photo = ImageTk.PhotoImage(image=pil_image)
+            
+            # Update the label with new image
+            self.video_label.configure(image=photo)
+            self.video_label.image = photo  # Keep a reference!
+            
         except Exception as e:
-            print(f"Error converting image: {e}")
+            self.get_logger().error(f"Error processing image: {str(e)}")
 
-    def update_image(self):
-        """Update the image in the TKinter GUI"""
-        if self.image is not None:
-            try:
-                # Convert the OpenCV image to PIL format
-                img = Image.fromarray(self.image)
-                # Convert to ImageTk format
-                imgtk = ImageTk.PhotoImage(image=img)
-                # Update the panel with the new image
-                self.panel.imgtk = imgtk
-                self.panel.config(image=imgtk)
-            except Exception as e:
-                print(f"Error updating image in GUI: {e}")
-        # Schedule the next image update
-        self.root.after(30, self.update_image)  # Update at approximately 30 FPS
+    def cleanup_and_quit(self):
+        """Clean up and close the window"""
+        self.destroy_node()
+        self.master.quit()
+        self.master.destroy()
 
-    def spin_ros(self):
-        """Spin the ROS node to handle callbacks"""
-        try:
-            rclpy.spin_once(self.node, timeout_sec=0)
-        except Exception as e:
-            print(f"Error spinning ROS node: {e}")
-        # Schedule the next ROS spin
-        self.root.after(10, self.spin_ros)
-
-    def on_close(self):
-        """Handle closing of the TKinter window and cleanup"""
-        print("Shutting down...")
-        self.image_subscriber.destroy()
-        self.node.destroy_node()
-        rclpy.shutdown()
-        self.root.destroy()
+    def update(self):
+        """Update the GUI and process ROS callbacks"""
+        rclpy.spin_once(self, timeout_sec=0)  # Process any pending callbacks
+        self.master.after(10, self.update)  # Schedule the next update
 
 def main():
-    gui = VideoGUI()
+    rclpy.init()
+    
+    root = tk.Tk()
+    app = VideoStreamGUI(root)
+    
+    # Set up periodic GUI updates
+    app.update()
+    
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("Shutting down")
+    finally:
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+import tkinter as tk
+from tkinter import ttk
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+import cv2
+from PIL import Image as PILImage
+from PIL import ImageTk
+
+class VideoStreamGUI(Node):
+    def __init__(self, master):
+        super().__init__('tkinter_video_viewer')
+        self.master = master
+        self.master.title("ROS2 Video Stream")
+        
+        # Initialize the bridge between ROS and OpenCV
+        self.bridge = CvBridge()
+        
+        # Create a label to display the video
+        self.video_label = ttk.Label(master)
+        self.video_label.pack(padx=10, pady=10)
+        
+        # Subscribe to the image topic
+        self.image_sub = self.create_subscription(
+            Image,
+            'image_raw/uncompressed',
+            self.image_callback,
+            10  # QoS profile depth
+        )
+        
+        # Add a quit button
+        self.quit_button = ttk.Button(
+            master,
+            text="Quit",
+            command=self.cleanup_and_quit
+        )
+        self.quit_button.pack(pady=5)
+
+    def image_callback(self, msg):
+        try:
+            # Convert ROS Image message to OpenCV image
+            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            
+            # Convert OpenCV image to PIL format
+            pil_image = PILImage.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB))
+            
+            # Convert PIL image to PhotoImage for Tkinter
+            photo = ImageTk.PhotoImage(image=pil_image)
+            
+            # Update the label with new image
+            self.video_label.configure(image=photo)
+            self.video_label.image = photo  # Keep a reference!
+            
+        except Exception as e:
+            self.get_logger().error(f"Error processing image: {str(e)}")
+
+    def cleanup_and_quit(self):
+        """Clean up and close the window"""
+        self.destroy_node()
+        self.master.quit()
+        self.master.destroy()
+
+    def update(self):
+        """Update the GUI and process ROS callbacks"""
+        rclpy.spin_once(self, timeout_sec=0)  # Process any pending callbacks
+        self.master.after(10, self.update)  # Schedule the next update
+
+def main():
+    rclpy.init()
+    
+    root = tk.Tk()
+    app = VideoStreamGUI(root)
+    
+    # Set up periodic GUI updates
+    app.update()
+    
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("Shutting down")
+    finally:
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
