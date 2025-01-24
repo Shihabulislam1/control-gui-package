@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'gui = control_gui.control_gui_tk:main',
+            'cam1= control_gui.main_cam_feedback:main',
         ],
     },
 )
