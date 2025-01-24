@@ -130,7 +130,7 @@ class Tab1(tk.Frame, Node):
         self.bridge = CvBridge()
         self.image_subscriber = self.create_subscription(
             ROSImage,
-            'ImagePublisher',
+            'main_camera/image_raw',
             self.image_callback,
             10
         )
