@@ -10,6 +10,8 @@
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>rqt</depend>
+  <depend>python3-pil</depend>
+  <depend>python3-pillow</depend>
   <depend>rqt-common-plugins</depend>
   <depend>rqt-robot-plugins</depend>
   <depend>cv_bridge</depend>

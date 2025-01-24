@@ -53,7 +53,8 @@ class ControlGUI(tk.Tk):
         # Sidebar
         self.sidebar = Sidebar(self.container, self)
         self.sidebar.pack(side="left", fill="y")
-
+        # Start spinning the node
+        self.spin()
         # Frame for Tabs
         # self.main_frame = tk.Frame(self.container, bg="#bdc3c7")
         # self.main_frame.pack(side="right", fill="both", expand=True)
@@ -70,6 +71,7 @@ class ControlGUI(tk.Tk):
         new_window.geometry("800x600")
         
         tab = tab_class(new_window, 
+                        self.node,
                         self.cmd_vel_publisher, 
                         self.arm_command_publisher, 
                         self.actuator_command_publishers, 
@@ -96,7 +98,12 @@ class ControlGUI(tk.Tk):
         if hasattr(self, 'node'):
             rclpy.spin_once(self.node, timeout_sec=0)
         self.after(10, self.spin)
-        
+
+    def spin(self):
+        """Handle ROS callbacks for the main node"""
+        if hasattr(self, 'node'):
+            rclpy.spin_once(self.node, timeout_sec=0)
+        self.after(10, self.spin)
     def cleanup(self):
         """Clean up ROS nodes before destroying the window"""
         print("Cleaning up ROS nodes...")
@@ -137,16 +144,16 @@ class Sidebar(tk.Frame):
 
 
 
-class Tab1(tk.Frame, Node):
-    def __init__(self, parent, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
+class Tab1(tk.Frame):
+    def __init__(self, parent,node, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
         tk.Frame.__init__(self, parent, bg="white")
-        Node.__init__(self, 'tab1_node')
         
+        self.node=node
         self.image = None
         self.bridge = CvBridge()
         print("Initializing Tab1...")
 
-        self.image_subscriber = self.create_subscription(
+        self.image_subscriber = self.node.create_subscription(
             ROSImage,
             'image_raw/uncompressed',
             self.image_callback,
@@ -233,9 +240,8 @@ class Tab1(tk.Frame, Node):
 
         self.image = None
         self.update_image()
-        self.spin()
         print("Tab1 initialization complete")
-        self.after(1000, self.check_subscriber)  # Check every second
+
 
 
     def create_actuator_control_buttons(self, parent, index):
@@ -383,14 +389,7 @@ class Tab1(tk.Frame, Node):
         self.relay_switch_publisher.publish(relay_command)
         print(f"Sending {command} command to Channel {index+1}")
 
-    def spin(self):
-        """Handle ROS callbacks."""
-        try:
-            rclpy.spin_once(self, timeout_sec=0)
-            print("Spinning Tab1 node")  # Debug print
-        except Exception as e:
-            print(f"Error in spin: {e}")
-        self.after(10, self.spin)
+
 
 
 class Tab2(tk.Frame):

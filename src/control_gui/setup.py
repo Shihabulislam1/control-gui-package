@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools',"opencv-python","pillow","rclpy"],
     zip_safe=True,
     maintainer='merr2',
     maintainer_email='mdshihabulislam.mte.ruet@gmail.com',
