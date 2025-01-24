@@ -9,6 +9,7 @@ from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
 import cv2
 
+
 class ControlGUI(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -89,6 +90,12 @@ class ControlGUI(tk.Tk):
             del self._open_windows[tab_class.__name__]
             
         new_window.protocol("WM_DELETE_WINDOW", on_closing)
+
+    def spin(self):
+        """Handle ROS callbacks for the main node"""
+        if hasattr(self, 'node'):
+            rclpy.spin_once(self.node, timeout_sec=0)
+        self.after(10, self.spin)
         
     def cleanup(self):
         """Clean up ROS nodes before destroying the window"""
@@ -158,9 +165,6 @@ class Tab1(tk.Frame, Node):
         self.video_label = tk.Label(self, bg="black")
         self.video_label.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
-        self.update_image()
-        self.spin()
-        print("Tab1 initialization complete")
 
         # Stop stream button
         self.stream_button = tk.Button(self, text="Stop Stream", command=self.stop_stream, font=("Arial", 12))
@@ -229,6 +233,9 @@ class Tab1(tk.Frame, Node):
 
         self.image = None
         self.update_image()
+        self.spin()
+        print("Tab1 initialization complete")
+        self.after(1000, self.check_subscriber)  # Check every second
 
 
     def create_actuator_control_buttons(self, parent, index):
@@ -289,6 +296,17 @@ class Tab1(tk.Frame, Node):
         
         self.after(33, self.update_image)  # Update at ~30 FPS
 
+    def check_subscriber(self):
+        """Check if the subscriber is receiving messages"""
+        try:
+            topics = self.get_topic_names()
+            print(f"Available topics: {topics}")
+            if 'image_raw/uncompressed' in topics:
+                print("Image topic is available")
+            else:
+                print("Image topic is not available")
+        except Exception as e:
+            print(f"Error checking subscriber: {e}")
     
 
     def stop_stream(self):
@@ -369,9 +387,10 @@ class Tab1(tk.Frame, Node):
         """Handle ROS callbacks."""
         try:
             rclpy.spin_once(self, timeout_sec=0)
+            print("Spinning Tab1 node")  # Debug print
         except Exception as e:
             print(f"Error in spin: {e}")
-        self.after(10, self.spin)  # Schedule the next spin
+        self.after(10, self.spin)
 
 
 class Tab2(tk.Frame):
