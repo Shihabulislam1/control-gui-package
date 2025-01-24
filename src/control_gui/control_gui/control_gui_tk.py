@@ -89,11 +89,19 @@ class ControlGUI(tk.Tk):
             del self._open_windows[tab_class.__name__]
             
         new_window.protocol("WM_DELETE_WINDOW", on_closing)
-
+        
+    def cleanup(self):
+        """Clean up ROS nodes before destroying the window"""
+        print("Cleaning up ROS nodes...")
+        for window in self._open_windows.values():
+            if window.winfo_exists():
+                window.destroy()
+        rclpy.shutdown()
+        self.quit()
 
     def __del__(self):
         # Cleanup ROS2
-        rclpy.shutdown()
+        rclpy.cleanup()
 
 
 
@@ -127,13 +135,17 @@ class Tab1(tk.Frame, Node):
         tk.Frame.__init__(self, parent, bg="white")
         Node.__init__(self, 'tab1_node')
         
+        self.image = None
         self.bridge = CvBridge()
+        print("Initializing Tab1...")
+
         self.image_subscriber = self.create_subscription(
             ROSImage,
-            'main_camera/image_raw',
+            'image_raw/uncompressed',
             self.image_callback,
             10
         )
+        print("Image subscriber created for topic 'main_camera/image_raw'.")
 
         # Use publishers passed from ControlGUI
         self.cmd_vel_publisher = cmd_vel_publisher
@@ -145,6 +157,10 @@ class Tab1(tk.Frame, Node):
         # Video stream label
         self.video_label = tk.Label(self, bg="black")
         self.video_label.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+
+        self.update_image()
+        self.spin()
+        print("Tab1 initialization complete")
 
         # Stop stream button
         self.stream_button = tk.Button(self, text="Stop Stream", command=self.stop_stream, font=("Arial", 12))
@@ -244,21 +260,47 @@ class Tab1(tk.Frame, Node):
 
     def image_callback(self, msg):
         """Callback function to handle image messages."""
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        self.image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+            print("Image received in callback")  # Debug print
+        except Exception as e:
+            print(f"Error in image callback: {e}")
 
     def update_image(self):
         """Update the video stream in the Tkinter label."""
-        if self.image is not None:
-            img = Image.fromarray(self.image)
-            imgtk = ImageTk.PhotoImage(image=img)
-            self.video_label.imgtk = imgtk
-            self.video_label.configure(image=imgtk)
-        self.after(10, self.update_image)
+        try:
+            if self.image is not None:
+                # Resize image if needed
+                height, width = self.image.shape[:2]
+                desired_width = 640  # Adjust as needed
+                ratio = desired_width / width
+                desired_height = int(height * ratio)
+                
+                resized = cv2.resize(self.image, (desired_width, desired_height))
+                
+                img = Image.fromarray(resized)
+                imgtk = ImageTk.PhotoImage(image=img)
+                self.video_label.imgtk = imgtk
+                self.video_label.configure(image=imgtk)
+                print("Image updated in GUI")  # Debug print
+        except Exception as e:
+            print(f"Error updating image: {e}")
+        
+        self.after(33, self.update_image)  # Update at ~30 FPS
+
+    
 
     def stop_stream(self):
         """Stop the video stream."""
-        self.image_subscriber.destroy()
+        try:
+            if hasattr(self, 'image_subscriber'):
+                self.image_subscriber.destroy()
+                self.image = None
+                self.video_label.configure(image='')
+                print("Stream stopped")
+        except Exception as e:
+            print(f"Error stopping stream: {e}")
 
     def move_forward(self):
         speed = self.speed_slider.get()/100
@@ -323,6 +365,14 @@ class Tab1(tk.Frame, Node):
         self.relay_switch_publisher.publish(relay_command)
         print(f"Sending {command} command to Channel {index+1}")
 
+    def spin(self):
+        """Handle ROS callbacks."""
+        try:
+            rclpy.spin_once(self, timeout_sec=0)
+        except Exception as e:
+            print(f"Error in spin: {e}")
+        self.after(10, self.spin)  # Schedule the next spin
+
 
 class Tab2(tk.Frame):
     def __init__(self, parent, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
@@ -373,8 +423,15 @@ class Tab3(tk.Frame):
 
 
 def main():
-    app = ControlGUI()
-    app.mainloop()
+    try:
+        app = ControlGUI()
+        app.protocol("WM_DELETE_WINDOW", app.cleanup)  # Proper cleanup on window close
+        app.mainloop()
+    except Exception as e:
+        print(f"Error in main: {e}")
+    finally:
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
