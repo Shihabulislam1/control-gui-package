@@ -149,33 +149,18 @@ class Tab1(tk.Frame):
         tk.Frame.__init__(self, parent, bg="white")
         
         self.node=node
-        self.image = None
-        self.bridge = CvBridge()
-        print("Initializing Tab1...")
+       
 
-        self.image_subscriber = self.node.create_subscription(
-            ROSImage,
-            'image_raw/uncompressed',
-            self.image_callback,
-            10
-        )
-        print("Image subscriber created for topic 'main_camera/image_raw'.")
+    
 
         # Use publishers passed from ControlGUI
         self.cmd_vel_publisher = cmd_vel_publisher
         self.arm_command_publisher = arm_command_publisher
         self.actuator_command_publishers = actuator_command_publishers
         self.relay_switch_publisher = relay_switch_publisher
+        self.drill_motor_publisher = drill_motor_publisher
 
 
-        # Video stream label
-        self.video_label = tk.Label(self, bg="black")
-        self.video_label.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
-
-
-        # Stop stream button
-        self.stream_button = tk.Button(self, text="Stop Stream", command=self.stop_stream, font=("Arial", 12))
-        self.stream_button.pack(pady=5)
 
         # Frames for side-by-side layout
         self.control_frames_container = tk.Frame(self, bg="white")
@@ -238,8 +223,22 @@ class Tab1(tk.Frame):
         for i in range(25):
             self.create_relay_switch_buttons(self.relay_switch_control_frame, i)
 
-        self.image = None
-        self.update_image()
+
+
+        # Drill motor control section
+        self.drill_motor_control_section = tk.Frame(self, bg="white")
+        self.drill_motor_control_section.pack(pady=10, fill=tk.X)
+
+        label = tk.Label(self, text="Drill Motor Control", font=("Arial", 16))
+        label.pack(pady=10)
+
+        # Drill motor control buttons
+        self.on_button = tk.Button(self, text="Turn Drill Motor ON", command=self.turn_drill_motor_on, font=("Arial", 12))
+        self.on_button.pack(pady=5)
+
+        self.off_button = tk.Button(self, text="Turn Drill Motor OFF", command=self.turn_drill_motor_off, font=("Arial", 12))
+        self.off_button.pack(pady=5)
+
         print("Tab1 initialization complete")
 
 
@@ -270,61 +269,6 @@ class Tab1(tk.Frame):
         off_button = tk.Button(parent, text="OFF", command=lambda: self.send_relay_switch_command(index, "OFF"), font=("Arial", 12))
         off_button.grid(row=row, column=col*3+2, padx=5, pady=5)  # Place the OFF button next to the ON button
 
-
-    def image_callback(self, msg):
-        """Callback function to handle image messages."""
-        try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            self.image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-            print("Image received in callback")  # Debug print
-        except Exception as e:
-            print(f"Error in image callback: {e}")
-
-    def update_image(self):
-        """Update the video stream in the Tkinter label."""
-        try:
-            if self.image is not None:
-                # Resize image if needed
-                height, width = self.image.shape[:2]
-                desired_width = 640  # Adjust as needed
-                ratio = desired_width / width
-                desired_height = int(height * ratio)
-                
-                resized = cv2.resize(self.image, (desired_width, desired_height))
-                
-                img = Image.fromarray(resized)
-                imgtk = ImageTk.PhotoImage(image=img)
-                self.video_label.imgtk = imgtk
-                self.video_label.configure(image=imgtk)
-                print("Image updated in GUI")  # Debug print
-        except Exception as e:
-            print(f"Error updating image: {e}")
-        
-        self.after(33, self.update_image)  # Update at ~30 FPS
-
-    def check_subscriber(self):
-        """Check if the subscriber is receiving messages"""
-        try:
-            topics = self.get_topic_names()
-            print(f"Available topics: {topics}")
-            if 'image_raw/uncompressed' in topics:
-                print("Image topic is available")
-            else:
-                print("Image topic is not available")
-        except Exception as e:
-            print(f"Error checking subscriber: {e}")
-    
-
-    def stop_stream(self):
-        """Stop the video stream."""
-        try:
-            if hasattr(self, 'image_subscriber'):
-                self.image_subscriber.destroy()
-                self.image = None
-                self.video_label.configure(image='')
-                print("Stream stopped")
-        except Exception as e:
-            print(f"Error stopping stream: {e}")
 
     def move_forward(self):
         speed = self.speed_slider.get()/100
@@ -388,12 +332,26 @@ class Tab1(tk.Frame):
         relay_command.data = f"Channel {index+1} {command}"
         self.relay_switch_publisher.publish(relay_command)
         print(f"Sending {command} command to Channel {index+1}")
+    
+    def turn_drill_motor_on(self):
+        """Send 'on' command to the drill motor."""
+        message = ROSString()
+        message.data = "on"
+        self.drill_motor_publisher.publish(message)
+        print("Drill motor ON command sent")
+
+    def turn_drill_motor_off(self):
+        """Send 'off' command to the drill motor."""
+        message = ROSString()
+        message.data = "off"
+        self.drill_motor_publisher.publish(message)
+        print("Drill motor OFF command sent")
 
 
 
 
 class Tab2(tk.Frame):
-    def __init__(self, parent, cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
+    def __init__(self, parent, node,cmd_vel_publisher, arm_command_publisher, actuator_command_publishers, relay_switch_publisher, drill_motor_publisher, drill_motor_position_motor_publisher, soil_sensor_motor_publisher, science_motor1_publisher, science_motor2_publisher):
         super().__init__(parent, bg="white")
 
         label = tk.Label(self, text="TAB 2: 5 DC Motor Control", font=("Arial", 16))
