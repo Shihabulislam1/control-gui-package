@@ -15,7 +15,7 @@ class VideoViewer(Node):
         self.bridge = CvBridge()
         self.image_subscriber = self.create_subscription(
             ROSImage,
-            'main_camera/image_raw',
+            'image_raw/uncompressed',
             self.image_callback,
             10)
 
