@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'drill = drill_control.drill_motor_subscriber:main',
             'arm = drill_control.arm_control:main',
+            'relay = drill_control.relay_channel_control:main',
         ],
     },
 )
