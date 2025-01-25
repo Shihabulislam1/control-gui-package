@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'drill = drill_control.drill_motor_subscriber:main',
+            'arm = drill_control.arm_control:main',
         ],
     },
 )
