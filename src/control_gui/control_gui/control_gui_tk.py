@@ -151,8 +151,6 @@ class Tab1(tk.Frame):
         self.node=node
        
 
-    
-
         # Use publishers passed from ControlGUI
         self.cmd_vel_publisher = cmd_vel_publisher
         self.arm_command_publisher = arm_command_publisher
@@ -244,10 +242,13 @@ class Tab1(tk.Frame):
 
 
     def create_actuator_control_buttons(self, parent, index):
-        label = tk.Label(parent, text=f"Actuator {index+1}", font=("Arial", 12), bg="white")
+        actuator_names = ["Base", "Shoulder", "Elbow", "Wrist", "Gripper"]
+        label_text = actuator_names[index] if index < len(actuator_names) else f"Actuator {index+1}"
+        
+        label = tk.Label(parent, text=label_text, font=("Arial", 12), bg="white")
         label.grid(row=index, column=0, padx=5, pady=5)
 
-        start_button = tk.Button(parent, text="Start", command=lambda: self.send_actuator_command(index, "start"), font=("Arial", 12))
+        start_button = tk.Button(parent, text="Forward", command=lambda: self.send_actuator_command(index, "start"), font=("Arial", 12))
         start_button.grid(row=index, column=1, padx=5, pady=5)
 
         stop_button = tk.Button(parent, text="Stop", command=lambda: self.send_actuator_command(index, "stop"), font=("Arial", 12))
