@@ -113,9 +113,7 @@ class ControlGUI(tk.Tk):
         rclpy.shutdown()
         self.quit()
 
-    def __del__(self):
-        # Cleanup ROS2
-        rclpy.cleanup()
+
 
 
 
